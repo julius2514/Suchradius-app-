@@ -1,122 +1,72 @@
 <!doctype html>
 <html lang="de">
 <head>
-<meta charset="utf-8" />
-<title>RescueRadar – Suchradius App</title>
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
-<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
-<style>
-/* === Grundlayout === */
-body {
-  margin:0; font-family:Arial,Helvetica,sans-serif;
-  height:100vh; display:flex; gap:16px;
-  background: linear-gradient(135deg,#dbeafe,#ccfbf1);
-  padding:16px; box-sizing:border-box;
-}
-.sidebar {
-  width:360px; background:#fff; border-radius:12px; padding:18px;
-  box-shadow:0 8px 24px rgba(2,6,23,0.08);
-  overflow:auto; display:flex; flex-direction:column; justify-content:space-between;
-}
-.mapwrap { flex:1; background:#fff; border-radius:12px;
-  box-shadow:0 8px 24px rgba(2,6,23,0.08); display:flex; flex-direction:column; }
-#map { flex:1; border-radius:12px; }
-h2{ margin:0 0 12px; color:#0b1220; text-align:center;}
-label{display:block; margin-top:10px; font-weight:700; color:#0b1220;}
-input[type=text], input[type=number], select, button {
-  width:100%; padding:8px; margin-top:6px; border-radius:8px;
-  border:1px solid #d1d5db; box-sizing:border-box; font-size:14px;
-}
-button {
-  background:linear-gradient(90deg,#3b82f6,#14b8a6);
-  color:#fff; font-weight:700; cursor:pointer; border:none;
-}
-button.secondary {
-  background:linear-gradient(90deg,#64748b,#94a3b8);
-  margin-top:8px;
-}
-.status { margin-top:12px; font-weight:700; text-align:center; color:#0b1220; }
-.spinner {
-  border:4px solid #f3f3f3; border-top:4px solid #3b82f6;
-  border-radius:50%; width:30px; height:30px;
-  animation:spin 1s linear infinite; margin:8px auto; display:none;
-}
-@keyframes spin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
-.card { background:#f8fafc; padding:14px; border-radius:8px;
-  margin-bottom:20px; box-shadow:0 2px 8px rgba(2,6,23,0.04); position:relative;
-}
-.card h3 { margin:-14px -14px 12px -14px; padding:8px 12px; font-size:15px;
-  font-weight:700; color:#fff; border-top-left-radius:8px; border-top-right-radius:8px;
-}
-.card.einsatzort { border:2px solid #facc15; }
-.card.einsatzort h3 { background:linear-gradient(90deg,#facc15,#fbbf24); }
-.card.personen { border:2px solid #3b82f6; }
-.card.personen h3 { background:linear-gradient(90deg,#3b82f6,#2563eb); }
-.card.berechnung { border:2px solid #22c55e; }
-.card.berechnung h3 { background:linear-gradient(90deg,#22c55e,#16a34a); }
-.card.suchgebiete { border:2px solid #ef4444; }
-.card.suchgebiete h3 { background:linear-gradient(90deg,#ef4444,#dc2626); }
-small.hint { color:#475569; display:block; margin-top:6px; }
-.distance { margin-top:10px; font-weight:700; text-align:center; color:#1e3a8a; }
+  <meta charset="utf-8" />
+  <title>RescueMapper – Suchradius App</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+  <style>
+    body { margin:0; font-family:Arial,Helvetica,sans-serif; height:100vh; display:flex; gap:16px; background: linear-gradient(135deg,#dbeafe,#ccfbf1); padding:16px; box-sizing:border-box; }
+    .sidebar { width:360px; background:#fff; border-radius:12px; padding:18px; box-shadow:0 8px 24px rgba(2,6,23,0.08); overflow:auto; display:flex; flex-direction:column; justify-content:space-between; }
+    .mapwrap { flex:1; background:#fff; border-radius:12px; box-shadow:0 8px 24px rgba(2,6,23,0.08); display:flex; flex-direction:column; }
+    #map { flex:1; border-radius:12px; }
+    h2{ margin:0 0 12px; color:#0b1220; text-align:center;}
+    label{display:block; margin-top:10px; font-weight:700; color:#0b1220;}
+    input[type=text], input[type=number], select, button { width:100%; padding:8px; margin-top:6px; border-radius:8px; border:1px solid #d1d5db; box-sizing:border-box; font-size:14px; }
+    button { background:linear-gradient(90deg,#3b82f6,#14b8a6); color:#fff; font-weight:700; cursor:pointer; border:none; }
+    button.secondary { background:linear-gradient(90deg,#64748b,#94a3b8); margin-top:8px; }
+    .status { margin-top:12px; font-weight:700; text-align:center; color:#0b1220; }
+    .spinner { border:4px solid #f3f3f3; border-top:4px solid #3b82f6; border-radius:50%; width:30px; height:30px; animation:spin 1s linear infinite; margin:8px auto; display:none; }
+    @keyframes spin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
 
-/* === LOGIN SCREEN === */
-#loginScreen {
-  position:fixed; top:0; left:0; width:100%; height:100%;
-  background:url('https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1920&q=80')
-    no-repeat center center/cover;
-  display:flex; justify-content:center; align-items:center; z-index:1000;
-}
-#loginScreen::after {
-  content:""; position:absolute; top:0; left:0; width:100%; height:100%;
-  background:rgba(0,0,0,0.35);
-}
-.login-card {
-  position:relative; background:rgba(255,255,255,0.95);
-  padding:50px 40px; border-radius:20px;
-  box-shadow:0 15px 50px rgba(0,0,0,0.3);
-  text-align:center; width:350px;
-  transform:translateY(50px); opacity:0;
-  animation:slideFadeIn 0.8s forwards;
-}
-@keyframes slideFadeIn {
-  0% { transform:translateY(50px); opacity:0; }
-  100% { transform:translateY(0); opacity:1; }
-}
-.login-card h1 { font-size:28px; margin-bottom:12px; color:#0b1220; }
-.login-card p { margin-bottom:20px; color:#333; font-size:16px; }
-.login-card input {
-  width:100%; padding:12px; margin:8px 0; border-radius:12px;
-  border:1px solid #d1d5db; font-size:16px;
-  box-sizing:border-box; opacity:0;
-  animation:inputFade 0.8s forwards; animation-delay:0.3s;
-}
-.login-card button {
-  padding:12px 20px; margin-top:15px; width:100%; border-radius:12px;
-  border:none; font-weight:700; font-size:16px; color:#fff;
-  background:linear-gradient(90deg,#3b82f6,#14b8a6);
-  cursor:pointer; opacity:0;
-  animation:inputFade 0.8s forwards; animation-delay:0.5s;
-  transition:background 0.3s ease, transform 0.2s ease;
-}
-.login-card button:hover {
-  background:linear-gradient(90deg,#2563eb,#0d9488);
-  transform:translateY(-2px);
-}
-#errorMsg { color:red; margin-top:12px; font-weight:600; }
-@keyframes inputFade {
-  0% { opacity:0; transform:translateY(10px); }
-  100% { opacity:1; transform:translateY(0); }
-}
-</style>
+    /* Karten (Bausteine) */
+    .card { background:#f8fafc; padding:14px; border-radius:8px; margin-bottom:20px; box-shadow:0 2px 8px rgba(2,6,23,0.04); position:relative; }
+    .card h3 { margin:-14px -14px 12px -14px; padding:8px 12px; font-size:15px; font-weight:700; color:#fff; border-top-left-radius:8px; border-top-right-radius:8px; }
+    .card.einsatzort { border:2px solid #facc15; }
+    .card.einsatzort h3 { background:linear-gradient(90deg,#facc15,#fbbf24); }
+    .card.personen { border:2px solid #3b82f6; }
+    .card.personen h3 { background:linear-gradient(90deg,#3b82f6,#2563eb); }
+    .card.berechnung { border:2px solid #22c55e; }
+    .card.berechnung h3 { background:linear-gradient(90deg,#22c55e,#16a34a); }
+    .card.suchgebiete { border:2px solid #ef4444; }
+    .card.suchgebiete h3 { background:linear-gradient(90deg,#ef4444,#dc2626); }
+    small.hint { color:#475569; display:block; margin-top:6px; }
+    .distance { margin-top:10px; font-weight:700; text-align:center; color:#1e3a8a; }
+
+    /* Login Overlay */
+    #loginScreen {
+      position:fixed; top:0; left:0; width:100%; height:100%;
+      background:url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1920&q=80') no-repeat center center/cover;
+      display:flex; justify-content:center; align-items:center;
+      z-index:1000;
+    }
+    #loginScreen::after {
+      content:""; position:absolute; top:0; left:0; width:100%; height:100%;
+      background:rgba(255,255,255,0.6);
+    }
+    .login-card {
+      position:relative;
+      background:rgba(255,255,255,0.95);
+      padding:40px 30px;
+      border-radius:16px;
+      box-shadow:0 12px 40px rgba(0,0,0,0.25);
+      text-align:center;
+      width:320px;
+    }
+    .login-card h1 { margin-bottom:12px; }
+    .login-card input { width:100%; padding:10px; margin:8px 0; border-radius:8px; border:1px solid #ccc; }
+    .login-card button { padding:10px; width:100%; margin-top:12px; }
+    #errorMsg { color:red; margin-top:10px; }
+  </style>
 </head>
 <body>
 
-<!-- LOGIN -->
+<!-- Login Overlay -->
 <div id="loginScreen">
   <div class="login-card">
-    <h1>RescueRadar</h1>
+    <h1>RescueMapper</h1>
     <p>Bitte logge dich ein</p>
     <input type="text" id="username" placeholder="Benutzername">
     <input type="password" id="password" placeholder="Passwort">
@@ -125,7 +75,7 @@ small.hint { color:#475569; display:block; margin-top:6px; }
   </div>
 </div>
 
-<!-- APP -->
+<!-- App Container -->
 <div id="app" style="display:none;">
   <div class="sidebar">
     <h2>Suchradiusgenerator</h2>
@@ -179,11 +129,14 @@ small.hint { color:#475569; display:block; margin-top:6px; }
     <button class="secondary" onclick="showLegend()">📘 Legende</button>
   </div>
 
-  <div class="mapwrap"><div id="map"></div></div>
+  <div class="mapwrap">
+    <div id="map"></div>
+  </div>
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
 <script>
 /* === LOGIN === */
 function checkLogin() {
@@ -193,17 +146,15 @@ function checkLogin() {
     document.getElementById('loginScreen').style.display = "none";
     document.getElementById('app').style.display = "flex";
   } else {
-    document.getElementById('errorMsg').textContent = "❌ Falsche Daten!";
+    document.getElementById('errorMsg').textContent = "Falsche Daten!";
   }
 }
 
-/* === APP === */
-const ORS_API_KEY = "DEIN_API_KEY_HIER"; // <-- hier deinen Key einsetzen
+/* === APP CODE === */
+const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjIwNjhjODIwMWIwYTRhOTJiMWJjNjEwNWM4Mzk1YTY5IiwiaCI6Im11cm11cjY0In0="
 
 const map = L.map('map').setView([49.1989, 8.1169], 13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom:19, attribution:'© OpenStreetMap'
-}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap'}).addTo(map);
 
 let startMarker=null, isoLayer=null, overlayLayer=null, startCoords=null;
 
@@ -238,14 +189,6 @@ function createOverlayAreasComplete(polygon, count){
       const clipped=turf.intersect(polygon,rect);
       if(clipped) overlays.push(clipped);
       n++;
-    }
-  }
-  if(overlays.length<count){
-    let missing=count-overlays.length;
-    const diff=turf.difference(polygon,turf.union(...overlays));
-    if(diff){
-      const extra=createOverlayAreasComplete(diff,missing);
-      overlays.push(...extra);
     }
   }
   return overlays;
@@ -291,7 +234,7 @@ async function calculate(){
     map.fitBounds(isoLayer.getBounds());
     setStatus('✔ Fertig — Isochrone angezeigt.');
   }catch(err){ console.error(err); setStatus('❌ Fehler bei Berechnung'); alert('Fehler bei der Berechnung — siehe Konsole.');}
-  finally{ showSpinner(false); }
+  finally{ showSpinner(false);}
 }
 
 async function searchLocation(){
@@ -311,11 +254,8 @@ async function searchLocation(){
 }
 
 function showLegend(){
-  alert(`📘 Legende
-🔴 Rote Fläche = berechnete Isochrone (max. Distanz)
-🎨 Bunte Flächen = gleichmäßig geteilte Suchgebiete
-📍 Marker = Einsatzort
-🟡 Alter / Fortbewegung / Stunden beeinflussen die Reichweite`);
+  const w=window.open('','Legende','width=420,height=520');
+  w.document.write(`<html><head><meta charset="utf-8"><title>Legende</title><style>body{font-family:Arial;padding:12px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:6px;text-align:center}</style></head><body><h3>Geschwindigkeitstabellen</h3><table><tr><th>Alter</th><th>Zu Fuß (km/h)</th></tr><tr><td>0–6</td><td>2.0</td></tr><tr><td>7–12</td><td>3.0</td></tr><tr><td>13–17</td><td>4.0</td></tr><tr><td>18–39</td><td>4.5</td></tr><tr><td>40–59</td><td>4.0</td></tr><tr><td>60–79</td><td>3.0</td></tr><tr><td>80+</td><td>2.0</td></tr></table></body></html>`);
 }
 </script>
 </body>
