@@ -34,9 +34,28 @@ button.secondary { background:linear-gradient(90deg,#64748b,#94a3b8); margin-top
 .card.suchgebiete h3 { background:linear-gradient(90deg,#ef4444,#dc2626); }
 small.hint { color:#475569; display:block; margin-top:6px; }
 .distance { margin-top:10px; font-weight:700; text-align:center; color:#1e3a8a; }
+
+/* Login Overlay */
+#loginScreen { position:fixed; top:0; left:0; width:100%; height:100%; background:#fff; display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:1000; }
+#loginScreen input { width:200px; padding:8px; margin:6px; }
+#loginScreen button { padding:8px 16px; margin-top:10px; }
+#errorMsg { color:red; margin-top:10px; }
 </style>
 </head>
 <body>
+
+<!-- Login Overlay -->
+<div id="loginScreen">
+  <h1>Suchradius App</h1>
+  <p>Bitte logge dich ein</p>
+  <input type="text" id="username" placeholder="Benutzername">
+  <input type="password" id="password" placeholder="Passwort">
+  <button onclick="checkLogin()">Login</button>
+  <p id="errorMsg"></p>
+</div>
+
+<!-- App Container -->
+<div id="app" style="display:none;">
 <div class="sidebar">
 <h2>Suchradiusgenerator</h2>
 
@@ -92,10 +111,26 @@ small.hint { color:#475569; display:block; margin-top:6px; }
 <div class="mapwrap">
 <div id="map"></div>
 </div>
+</div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
 <script>
+// === LOGIN ===
+function checkLogin() {
+  const user = document.getElementById('username').value;
+  const pass = document.getElementById('password').value;
+  // Benutzername und Passwort hier ändern
+  if(user === "admin" && pass === "geheim") {
+    document.getElementById('loginScreen').style.display = "none";
+    document.getElementById('app').style.display = "flex";
+  } else {
+    document.getElementById('errorMsg').textContent = "Falsche Daten!";
+  }
+}
+
+// === APP CODE ===
 const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjIwNjhjODIwMWIwYTRhOTJiMWJjNjEwNWM4Mzk1YTY5IiwiaCI6Im11cm11cjY0In0=";
 
 const map = L.map('map').setView([49.1989, 8.1169], 13);
