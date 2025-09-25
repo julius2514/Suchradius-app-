@@ -106,26 +106,133 @@ small.hint { color:#475569; display:block; margin-top:6px; }
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script>
-function checkLogin() {
-  const user = document.getElementById('username').value;
-  const pass = document.getElementById('password').value;
-  if(user === "admin" && pass === "geheim") {
-    document.getElementById('loginScreen').style.display = "none";
-    document.getElementById('app').style.display = "flex";
-    map.invalidateSize(); // Karte korrekt rendern
-  } else {
-    document.getElementById('errorMsg').textContent = "Falsche Daten!";
-  }
-}
-
 const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjIwNjhjODIwMWIwYTRhOTJiMWJjNjEwNWM4Mzk1YTY5IiwiaCI6Im11cm11cjY0In0=";
+let startMarker=null, isoLayer=null, overlayLayer=null, startCoords=null;
 
 const map = L.map('map').setView([49.1989, 8.1169], 13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap'}).addTo(map);
 
-let startMarker=null, isoLayer=null, overlayLayer=null, startCoords=null;
+// === LOGIN ===
+function checkLogin() {
+  const user = document.getElementById('username').value;
+  const pass = document.getElementById('password').value;
+  if(user==="admin" && pass==="geheim") {
+    document.getElementById('loginScreen').style.display="none";
+    document.getElementById('app').style.display="flex";
+    map.invalidateSize();
+  } else {
+    document.getElementById('errorMsg').textContent="Falsche Daten!";
+  }
+}
 
-// ... (Alle Funktionen calculate(), searchLocation(), updateOverlay(), createOverlayAreasComplete(), showLegend() hier einfügen, exakt wie in deinem Originalcode)
+// === APP-FUNKTIONEN ===
+function setStatus(txt){ document.getElementById('status').textContent=txt; }
+function showSpinner(on){ document.getElementById('spinner').style.display=on?'block':'none'; }
+function getBaseSpeedKmh(age){ return age<=6?2:age<=12?3:age<=17?4:age<=39?4.5:age<=59?4:age<=79?3:2; }
+function getFatigueFactor(age){ return age<=12?3:age<=59?6:age<=79?4:2.5; }
+function calculateDistanceKm(age,hours){ const base=getBaseSpeedKmh(age); const fatigue=getFatigueFactor(age); return base*(1/(1+(hours/fatigue)))*hours; }
+function generateDistinctColors(count){ const colors=[]; const step=360/count; for(let i=0;i<count;i++){colors.push(`hsl(${i*step},70%,60%)`);} return colors; }
+
+map.on('click', e=>{
+  if(document.getElementById('clickEnabled').checked){
+    startCoords={lat:e.latlng.lat,lng:e.latlng.lng};
+    if(startMarker) map.removeLayer(startMarker);
+    startMarker=L.marker([startCoords.lat,startCoords.lng]).addTo(map).bindPopup('Einsatzort').openPopup();
+  }
+});
+
+async function searchLocation(){
+  const query=[document.getElementById('place').value.trim(),document.getElementById('address').value.trim()].filter(Boolean).join(", ");
+  if(!query) return alert('Bitte Ort oder Adresse eingeben');
+  setStatus('🔎 Suche Ort…');
+  try{
+    const resp=await fetch('https://nominatim.openstreetmap.org/search?format=json&q='+encodeURIComponent(query));
+    const arr=await resp.json();
+    if(!arr || arr.length===0){ setStatus('Ort nicht gefunden'); return;}
+    const first=arr[0]; startCoords={lat:parseFloat(first.lat),lng:parseFloat(first.lon)};
+    if(startMarker) map.removeLayer(startMarker);
+    startMarker=L.marker([startCoords.lat,startCoords.lng]).addTo(map).bindPopup(first.display_name).openPopup();
+    map.setView([startCoords.lat,startCoords.lng],13);
+    setStatus('Ort gesetzt');
+  }catch(err){ console.error(err); setStatus('Fehler bei Ortssuche'); }
+}
+
+// Overlay Funktionen
+function createOverlayAreasComplete(polygon,count){
+  if(!polygon) return [];
+  const bbox=turf.bbox(polygon);
+  let overlays=[]; let cols=Math.ceil(Math.sqrt(count)); let rows=Math.ceil(count/cols);
+  while((cols-1)*rows>=count) cols--;
+  const dx=(bbox[2]-bbox[0])/cols; const dy=(bbox[3]-bbox[1])/rows;
+  let n=0;
+  for(let j=0;j<rows;j++){
+    for(let i=0;i<cols;i++){
+      if(n>=count) break;
+      const x0=bbox[0]+i*dx, y0=bbox[1]+j*dy;
+      const x1=(i===cols-1)?bbox[2]:x0+dx, y1=(j===rows-1)?bbox[3]:y0+dy;
+      const rect=turf.bboxPolygon([x0,y0,x1,y1]);
+      const clipped=turf.intersect(polygon,rect);
+      if(clipped) overlays.push(clipped);
+      n++;
+    }
+  }
+  if(overlays.length<count){
+    let missing=count-overlays.length;
+    const diff=turf.difference(polygon,turf.union(...overlays));
+    if(diff){
+      overlays.push(...createOverlayAreasComplete(diff,missing));
+    }
+  }
+  return overlays;
+}
+
+function updateOverlay(){
+  if(!isoLayer) return;
+  if(overlayLayer) map.removeLayer(overlayLayer);
+  if(!document.getElementById('splitEnabled').checked) return;
+  const count=parseInt(document.getElementById('splitCount').value);
+  const overlays=createOverlayAreasComplete(turf.feature(isoLayer.toGeoJSON().features[0].geometry),count);
+  const colors=generateDistinctColors(overlays.length);
+  overlayLayer=L.geoJSON(overlays,{
+    style:(feature)=>{ const idx=overlays.indexOf(feature); return {color:'#000',weight:2,fillOpacity:0.25,fillColor:colors[idx]}; }
+  }).addTo(map);
+}
+
+document.getElementById('splitEnabled').addEventListener('change',updateOverlay);
+document.getElementById('splitCount').addEventListener('change',updateOverlay);
+
+async function calculate(){
+  if(!startCoords){ alert('Bitte Einsatzort setzen.'); return;}
+  const age=Number(document.getElementById('age').value)||30;
+  const hours=Number(document.getElementById('hours').value)||1;
+  const distanceKm=calculateDistanceKm(age,hours);
+  const distanceM=Math.round(distanceKm*1000);
+  document.getElementById('distanceInfo').textContent=`Maximale Distanz: ${distanceKm.toFixed(2)} km`;
+  setStatus(`⏳ Berechne Isochrone für ${distanceKm.toFixed(2)} km …`);
+  showSpinner(true);
+  if(isoLayer) map.removeLayer(isoLayer);
+  if(overlayLayer) map.removeLayer(overlayLayer);
+  try{
+    const orsRes=await fetch('https://api.openrouteservice.org/v2/isochrones/foot-walking',{
+      method:'POST',
+      headers:{'Authorization':ORS_API_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({locations:[[startCoords.lng,startCoords.lat]],range:[distanceM],range_type:'distance',units:'m'})
+    });
+    if(!orsRes.ok) throw new Error(await orsRes.text());
+    const data=await orsRes.json();
+    const basePoly=turf.feature(data.features[0].geometry);
+    isoLayer=L.geoJSON(basePoly,{style:{color:'#ef4444',weight:2,fillOpacity:0.18}}).addTo(map);
+    updateOverlay();
+    map.fitBounds(isoLayer.getBounds());
+    setStatus('✔ Fertig — Isochrone angezeigt.');
+  }catch(err){ console.error(err); setStatus('❌ Fehler bei Berechnung'); alert('Fehler bei der Berechnung — siehe Konsole.');}
+  finally{ showSpinner(false);}
+}
+
+function showLegend(){
+  const w=window.open('','Legende','width=420,height=520');
+  w.document.write(`<html><head><meta charset="utf-8"><title>Legende</title><style>body{font-family:Arial;padding:12px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:6px;text-align:center}</style></head><body><h3>Geschwindigkeitstabellen</h3><table><tr><th>Alter</th><th>Zu Fuß (km/h)</th></tr><tr><td>0–6</td><td>2.0</td></tr><tr><td>7–12</td><td>3.0</td></tr><tr><td>13–17</td><td>4.0</td></tr><tr><td>18–39</td><td>4.5</td></tr><tr><td>40–59</td><td>4.0</td></tr><tr><td>60–79</td><td>3.0</td></tr><tr><td>80+</td><td>2.0</td></tr></table></body></html>`);
+}
 </script>
 </body>
 </html>
